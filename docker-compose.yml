@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: hyrvoai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hyrvoai
+      POSTGRES_USER: hyrvoai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hyrvoai_password}
+    ports:
+      - "5433:5432"
+    volumes:
+      - hyrvoai_postgres_data:/var/lib/postgresql
