@@ -158,7 +158,8 @@ export async function uploadAdminDocument(
   file,
   title,
   department,
-  version
+  version,
+  accessLevel
 ) {
   const formData = new FormData();
 
@@ -166,6 +167,7 @@ export async function uploadAdminDocument(
   formData.append('title', title);
   formData.append('department', department);
   formData.append('version', version);
+  formData.append('accessLevel', accessLevel);
 
   const response = await fetch(
     `${API_BASE_URL}/api/admin/documents/upload`,

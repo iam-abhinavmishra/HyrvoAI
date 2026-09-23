@@ -1,608 +1,797 @@
 import { useEffect, useState } from 'react';
+
 import { useAuth } from '../context/AuthContext';
+
 import ThemeToggle from '../components/ThemeToggle';
 
 import {
-  getAdminDocuments,
-  uploadAdminDocument,
-  deactivateAdminDocument,
+    getAdminDocuments,
+    uploadAdminDocument,
+    deactivateAdminDocument,
 } from '../services/api';
 
+
 function AdminDocuments() {
-  const { user, token } = useAuth();
 
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [deactivatingId, setDeactivatingId] = useState(null);
+    const { user, token } = useAuth();
 
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
-  const [file, setFile] = useState(null);
-  const [title, setTitle] = useState('');
-  const [department, setDepartment] = useState('GENERAL');
-  const [version, setVersion] = useState('1.0');
+    const [documents, setDocuments] = useState([]);
 
-  async function loadDocuments() {
-    try {
-      setLoading(true);
-      setError('');
+    const [loading, setLoading] = useState(true);
 
-      const data = await getAdminDocuments(token);
+    const [uploading, setUploading] = useState(false);
 
-      setDocuments(data);
-    } catch (err) {
-      setError(
-        err.message ||
-        'Failed to load documents.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    const [deactivatingId, setDeactivatingId] = useState(null);
 
-  useEffect(() => {
-    if (token && user?.role === 'ADMIN') {
-      loadDocuments();
-    }
-  }, [token, user]);
 
-  async function handleUpload(event) {
-    event.preventDefault();
+    const [error, setError] = useState('');
 
-    setError('');
-    setSuccess('');
+    const [success, setSuccess] = useState('');
 
-    if (!file) {
-      setError('Please select a PDF or DOCX file.');
-      return;
-    }
 
-    /*
-     * Allowed file types
-     */
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ];
+    const [file, setFile] = useState(null);
 
-    if (!allowedTypes.includes(file.type)) {
-      setError(
-        'Only PDF and DOC/DOCX files are supported.'
-      );
-      return;
+    const [title, setTitle] = useState('');
+
+    const [department, setDepartment] = useState('GENERAL');
+
+    const [version, setVersion] = useState('1.0');
+
+    const [accessLevel, setAccessLevel] = useState('EMPLOYEE');
+
+
+    async function loadDocuments() {
+
+        try {
+
+            setLoading(true);
+
+            setError('');
+
+
+            const data = await getAdminDocuments(token);
+
+
+            setDocuments(data);
+
+        } catch (err) {
+
+            setError(
+                err.message ||
+                'Failed to load documents.'
+            );
+
+        } finally {
+
+            setLoading(false);
+
+        }
+
     }
 
-    /*
-     * Maximum file size: 10 MB
-     */
-    const maxSize = 10 * 1024 * 1024;
 
-    if (file.size > maxSize) {
-      setError(
-        'File size must be less than 10 MB.'
-      );
-      return;
+    useEffect(() => {
+
+        if (token && user?.role === 'ADMIN') {
+
+            loadDocuments();
+
+        }
+
+    }, [token, user]);
+
+
+    async function handleUpload(event) {
+
+        event.preventDefault();
+
+
+        setError('');
+
+        setSuccess('');
+
+
+        if (!file) {
+
+            setError(
+                'Please select a PDF or DOCX file.'
+            );
+
+            return;
+
+        }
+
+
+        /*
+         * Allowed file types
+         */
+
+        const allowedTypes = [
+
+            'application/pdf',
+
+            'application/msword',
+
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+        ];
+
+
+        if (!allowedTypes.includes(file.type)) {
+
+            setError(
+                'Only PDF and DOC/DOCX files are supported.'
+            );
+
+            return;
+
+        }
+
+
+        /*
+         * Maximum file size: 10 MB
+         */
+
+        const maxSize = 10 * 1024 * 1024;
+
+
+        if (file.size > maxSize) {
+
+            setError(
+                'File size must be less than 10 MB.'
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            setUploading(true);
+
+
+            await uploadAdminDocument(
+                token,
+                file,
+                title,
+                department,
+                version,
+                accessLevel
+            );
+
+
+            setSuccess(
+                'Document uploaded successfully.'
+            );
+
+
+            /*
+             * Reset form
+             */
+
+            setFile(null);
+
+            setTitle('');
+
+            setDepartment('GENERAL');
+
+            setVersion('1.0');
+
+            setAccessLevel('EMPLOYEE');
+
+
+            const fileInput =
+                document.getElementById(
+                    'document-file'
+                );
+
+
+            if (fileInput) {
+
+                fileInput.value = '';
+
+            }
+
+
+            /*
+             * Refresh document list
+             */
+
+            await loadDocuments();
+
+
+        } catch (err) {
+
+            setError(
+                err.message ||
+                'Failed to upload document.'
+            );
+
+        } finally {
+
+            setUploading(false);
+
+        }
+
     }
 
-    try {
-      setUploading(true);
 
-      await uploadAdminDocument(
-        token,
-        file,
-        title,
-        department,
-        version
-      );
+    async function handleDeactivate(documentId) {
 
-      setSuccess(
-        'Document uploaded successfully.'
-      );
-
-      /*
-       * Reset form
-       */
-      setFile(null);
-      setTitle('');
-      setDepartment('GENERAL');
-      setVersion('1.0');
-
-      const fileInput =
-        document.getElementById(
-          'document-file'
+        const confirmed = window.confirm(
+            'Are you sure you want to deactivate this document?'
         );
 
-      if (fileInput) {
-        fileInput.value = '';
-      }
 
-      /*
-       * Refresh document list
-       */
-      await loadDocuments();
+        if (!confirmed) {
 
-    } catch (err) {
-      setError(
-        err.message ||
-        'Failed to upload document.'
-      );
-    } finally {
-      setUploading(false);
+            return;
+
+        }
+
+
+        try {
+
+            setDeactivatingId(documentId);
+
+            setError('');
+
+            setSuccess('');
+
+
+            await deactivateAdminDocument(
+                token,
+                documentId
+            );
+
+
+            setSuccess(
+                'Document deactivated successfully.'
+            );
+
+
+            /*
+             * Refresh active documents
+             */
+
+            await loadDocuments();
+
+
+        } catch (err) {
+
+            setError(
+                err.message ||
+                'Failed to deactivate document.'
+            );
+
+        } finally {
+
+            setDeactivatingId(null);
+
+        }
+
     }
-  }
 
-  async function handleDeactivate(documentId) {
-    const confirmed = window.confirm(
-      'Are you sure you want to deactivate this document?'
-    );
 
-    if (!confirmed) {
-      return;
+    /*
+     * Frontend admin protection
+     */
+
+    if (user?.role !== 'ADMIN') {
+
+        return (
+
+            <div className="admin-access-denied">
+
+                <h2>
+                    Access denied
+                </h2>
+
+                <p>
+                    You do not have permission to access
+                    this page.
+                </p>
+
+            </div>
+
+        );
+
     }
 
-    try {
-      setDeactivatingId(documentId);
-      setError('');
-      setSuccess('');
 
-      await deactivateAdminDocument(
-        token,
-        documentId
-      );
-
-      setSuccess(
-        'Document deactivated successfully.'
-      );
-
-      /*
-       * Refresh active documents
-       */
-      await loadDocuments();
-
-    } catch (err) {
-      setError(
-        err.message ||
-        'Failed to deactivate document.'
-      );
-    } finally {
-      setDeactivatingId(null);
-    }
-  }
-
-  /*
-   * Frontend admin protection
-   */
-  if (user?.role !== 'ADMIN') {
     return (
-      <div className="admin-access-denied">
-        <h2>Access denied</h2>
 
-        <p>
-          You do not have permission to access
-          this page.
-        </p>
-      </div>
-    );
-  }
+        <div className="admin-page">
 
-  return (
-    <div className="admin-page">
 
-      {/* ================= HEADER ================= */}
+            {/* ================= HEADER ================= */}
 
-      <header className="admin-header">
+            <header className="admin-header">
 
-        <div>
-          <h1>
-            Document Management
-          </h1>
+                <div>
 
-          <p>
-            Manage the documents used by HyrvoAI.
-          </p>
-        </div>
-        
-            <ThemeToggle />
+                    <h1>
+                        Document Management
+                    </h1>
 
+                    <p>
+                        Manage the documents used by HyrvoAI.
+                    </p>
 
-        <a
-          href="/chat"
-          className="admin-chat-link"
-        >
-          ← Back to Chat
-        </a>
+                </div>
 
-      </header>
 
+                <ThemeToggle />
 
-      {/* ================= ALERTS ================= */}
 
-      {error && (
-        <div className="admin-alert error">
-          {error}
-        </div>
-      )}
+                <a
+                    href="/chat"
+                    className="admin-chat-link"
+                >
+                    ← Back to Chat
+                </a>
 
-      {success && (
-        <div className="admin-alert success">
-          {success}
-        </div>
-      )}
+            </header>
 
 
-      {/* ================= UPLOAD ================= */}
+            {/* ================= ALERTS ================= */}
 
-      <section className="admin-card upload-card">
+            {error && (
 
-        <div className="admin-card-header">
+                <div className="admin-alert error">
 
-          <div>
-            <h2>
-              Upload Document
-            </h2>
+                    {error}
 
-            <p>
-              Add a new company policy, manual,
-              or internal document.
-            </p>
-          </div>
+                </div>
 
-        </div>
+            )}
 
 
-        <form
-          className="document-upload-form"
-          onSubmit={handleUpload}
-        >
+            {success && (
 
-          {/* FILE */}
+                <div className="admin-alert success">
 
-          <div className="form-group">
+                    {success}
 
-            <label htmlFor="document-file">
-              File
-            </label>
+                </div>
 
-            <input
-              id="document-file"
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(event) =>
-                setFile(
-                  event.target.files?.[0] || null
-                )
-              }
-            />
+            )}
 
-            <small>
-              Supported formats: PDF, DOC, DOCX
-              {' '}• Maximum size: 10 MB
-            </small>
 
-          </div>
+            {/* ================= UPLOAD ================= */}
 
+            <section className="admin-card upload-card">
 
-          {/* TITLE */}
+                <div className="admin-card-header">
 
-          <div className="form-group">
+                    <div>
 
-            <label htmlFor="document-title">
-              Title
-            </label>
+                        <h2>
+                            Upload Document
+                        </h2>
 
-            <input
-              id="document-title"
-              type="text"
-              placeholder="e.g. Leave Policy"
-              value={title}
-              onChange={(event) =>
-                setTitle(event.target.value)
-              }
-            />
+                        <p>
+                            Add a new company policy, manual,
+                            or internal document.
+                        </p>
 
-          </div>
+                    </div>
 
+                </div>
 
-          {/* DEPARTMENT + VERSION */}
 
-          <div className="form-row">
+                <form
+                    className="document-upload-form"
+                    onSubmit={handleUpload}
+                >
 
-            <div className="form-group">
 
-              <label htmlFor="document-department">
-                Department
-              </label>
+                    {/* FILE */}
 
-              <select
-                id="document-department"
-                value={department}
-                onChange={(event) =>
-                  setDepartment(
-                    event.target.value
-                  )
-                }
-              >
+                    <div className="form-group">
 
-                <option value="GENERAL">
-                  General
-                </option>
+                        <label htmlFor="document-file">
+                            File
+                        </label>
 
-                <option value="HR">
-                  HR
-                </option>
+                        <input
+                            id="document-file"
+                            type="file"
+                            accept=".pdf,.doc,.docx"
+                            onChange={(event) =>
+                                setFile(
+                                    event.target.files?.[0] || null
+                                )
+                            }
+                        />
 
-                <option value="IT">
-                  IT
-                </option>
+                        <small>
+                            Supported formats: PDF, DOC, DOCX
+                            {' '}• Maximum size: 10 MB
+                        </small>
 
-                <option value="FINANCE">
-                  Finance
-                </option>
+                    </div>
 
-                <option value="SALES">
-                  Sales
-                </option>
 
-                <option value="ENGINEERING">
-                  Engineering
-                </option>
+                    {/* TITLE */}
 
-              </select>
+                    <div className="form-group">
 
-            </div>
+                        <label htmlFor="document-title">
+                            Title
+                        </label>
 
+                        <input
+                            id="document-title"
+                            type="text"
+                            placeholder="e.g. Leave Policy"
+                            value={title}
+                            onChange={(event) =>
+                                setTitle(event.target.value)
+                            }
+                        />
 
-            <div className="form-group">
+                    </div>
 
-              <label htmlFor="document-version">
-                Version
-              </label>
 
-              <input
-                id="document-version"
-                type="text"
-                placeholder="1.0"
-                value={version}
-                onChange={(event) =>
-                  setVersion(
-                    event.target.value
-                  )
-                }
-              />
+                    {/* DEPARTMENT + VERSION */}
 
-            </div>
+                    <div className="form-row">
 
-          </div>
+                        <div className="form-group">
 
+                            <label htmlFor="document-department">
+                                Department
+                            </label>
 
-          {/* UPLOAD BUTTON */}
+                            <select
+                                id="document-department"
+                                value={department}
+                                onChange={(event) =>
+                                    setDepartment(
+                                        event.target.value
+                                    )
+                                }
+                            >
 
-          <button
-            type="submit"
-            className="upload-button"
-            disabled={uploading}
-          >
-            {uploading
-              ? 'Uploading...'
-              : 'Upload Document'}
-          </button>
+                                <option value="GENERAL">
+                                    General
+                                </option>
 
-        </form>
+                                <option value="HR">
+                                    HR
+                                </option>
 
-      </section>
+                                <option value="IT">
+                                    IT
+                                </option>
 
+                                <option value="FINANCE">
+                                    Finance
+                                </option>
 
-      {/* ================= ACTIVE DOCUMENTS ================= */}
+                                <option value="SALES">
+                                    Sales
+                                </option>
 
-      <section className="admin-card">
+                                <option value="ENGINEERING">
+                                    Engineering
+                                </option>
 
-        <div className="admin-card-header">
-
-          <div>
-
-            <h2>
-              Active Documents
-            </h2>
-
-            <p>
-              Documents currently available to
-              HyrvoAI.
-            </p>
-
-          </div>
-
-          <span className="document-count">
-            {documents.length}
-          </span>
-
-        </div>
-
-
-        {/* LOADING */}
-
-        {loading ? (
-
-          <div className="admin-loading">
-            Loading documents...
-          </div>
-
-        ) : documents.length === 0 ? (
-
-          /* EMPTY */
-
-          <div className="admin-empty">
-
-            <h3>
-              No documents yet
-            </h3>
-
-            <p>
-              Upload your first company document
-              above.
-            </p>
-
-          </div>
-
-        ) : (
-
-          /* TABLE */
-
-          <div className="documents-table-wrapper">
-
-            <table className="documents-table">
-
-              <thead>
-
-                <tr>
-
-                  <th>
-                    Document
-                  </th>
-
-                  <th>
-                    Department
-                  </th>
-
-                  <th>
-                    Version
-                  </th>
-
-                  <th>
-                    Uploaded
-                  </th>
-
-                  <th>
-                    Status
-                  </th>
-
-                  <th>
-                    Action
-                  </th>
-
-                </tr>
-
-              </thead>
-
-
-              <tbody>
-
-                {documents.map((document) => (
-
-                  <tr key={document.id}>
-
-                    {/* DOCUMENT */}
-
-                    <td>
-
-                      <div className="document-name">
-
-                        <span className="document-icon">
-                          📄
-                        </span>
-
-                        <div>
-
-                          <strong>
-                            {document.title ||
-                              document.fileName}
-                          </strong>
-
-                          <span>
-                            {document.fileName}
-                          </span>
+                            </select>
 
                         </div>
 
-                      </div>
 
-                    </td>
+                        <div className="form-group">
 
+                            <label htmlFor="document-version">
+                                Version
+                            </label>
 
-                    {/* DEPARTMENT */}
+                            <input
+                                id="document-version"
+                                type="text"
+                                placeholder="1.0"
+                                value={version}
+                                onChange={(event) =>
+                                    setVersion(
+                                        event.target.value
+                                    )
+                                }
+                            />
 
-                    <td>
-                      {document.department ||
-                        'GENERAL'}
-                    </td>
+                        </div>
 
-
-                    {/* VERSION */}
-
-                    <td>
-                      {document.version ||
-                        '1.0'}
-                    </td>
-
-
-                    {/* UPLOADED */}
-
-                    <td>
-
-                      {document.uploadedAt
-                        ? new Date(
-                            document.uploadedAt
-                          ).toLocaleDateString()
-                        : '—'}
-
-                    </td>
+                    </div>
 
 
-                    {/* STATUS */}
+                    {/* ACCESS LEVEL */}
 
-                    <td>
+                    <div className="form-group">
 
-                      <span className="status-badge active">
-                        Active
-                      </span>
+                        <label htmlFor="document-access-level">
+                            Access Level
+                        </label>
 
-                    </td>
+                        <select
+                            id="document-access-level"
+                            value={accessLevel}
+                            onChange={(event) =>
+                                setAccessLevel(
+                                    event.target.value
+                                )
+                            }
+                        >
+
+                            <option value="EMPLOYEE">
+                                Employee Only
+                            </option>
+
+                            <option value="PUBLIC">
+                                Public
+                            </option>
+
+                        </select>
+
+                        <small>
+                            Public documents can be used by the
+                            public HyrvoAI widget. Employee-only
+                            documents require authenticated access.
+                        </small>
+
+                    </div>
 
 
-                    {/* ACTION */}
+                    {/* UPLOAD BUTTON */}
 
-                    <td>
+                    <button
+                        type="submit"
+                        className="upload-button"
+                        disabled={uploading}
+                    >
 
-                      <button
-                        className="deactivate-button"
-                        onClick={() =>
-                          handleDeactivate(
-                            document.id
-                          )
-                        }
-                        disabled={
-                          deactivatingId ===
-                          document.id
-                        }
-                      >
+                        {uploading
+                            ? 'Uploading...'
+                            : 'Upload Document'}
 
-                        {deactivatingId ===
-                        document.id
-                          ? 'Deactivating...'
-                          : 'Deactivate'}
+                    </button>
 
-                      </button>
+                </form>
 
-                    </td>
+            </section>
 
-                  </tr>
 
-                ))}
+            {/* ================= ACTIVE DOCUMENTS ================= */}
 
-              </tbody>
+            <section className="admin-card">
 
-            </table>
+                <div className="admin-card-header">
 
-          </div>
+                    <div>
 
-        )}
+                        <h2>
+                            Active Documents
+                        </h2>
 
-      </section>
+                        <p>
+                            Documents currently available to
+                            HyrvoAI.
+                        </p>
 
-    </div>
-  );
+                    </div>
+
+                    <span className="document-count">
+                        {documents.length}
+                    </span>
+
+                </div>
+
+
+                {/* LOADING */}
+
+                {loading ? (
+
+                    <div className="admin-loading">
+                        Loading documents...
+                    </div>
+
+                ) : documents.length === 0 ? (
+
+                    /* EMPTY */
+
+                    <div className="admin-empty">
+
+                        <h3>
+                            No documents yet
+                        </h3>
+
+                        <p>
+                            Upload your first company document
+                            above.
+                        </p>
+
+                    </div>
+
+                ) : (
+
+                    /* TABLE */
+
+                    <div className="documents-table-wrapper">
+
+                        <table className="documents-table">
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        Document
+                                    </th>
+
+                                    <th>
+                                        Department
+                                    </th>
+
+                                    <th>
+                                        Version
+                                    </th>
+
+                                    <th>
+                                        Access
+                                    </th>
+
+                                    <th>
+                                        Uploaded
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Action
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
+
+                                {documents.map((document) => (
+
+                                    <tr key={document.id}>
+
+
+                                        {/* DOCUMENT */}
+
+                                        <td>
+
+                                            <div className="document-name">
+
+                                                <span className="document-icon">
+                                                    📄
+                                                </span>
+
+                                                <div>
+
+                                                    <strong>
+                                                        {document.title ||
+                                                            document.fileName}
+                                                    </strong>
+
+                                                    <span>
+                                                        {document.fileName}
+                                                    </span>
+
+                                                </div>
+
+                                            </div>
+
+                                        </td>
+
+
+                                        {/* DEPARTMENT */}
+
+                                        <td>
+                                            {document.department ||
+                                                'GENERAL'}
+                                        </td>
+
+
+                                        {/* VERSION */}
+
+                                        <td>
+                                            {document.version ||
+                                                '1.0'}
+                                        </td>
+
+
+                                        {/* ACCESS */}
+
+                                        <td>
+
+                                            {document.accessLevel === 'PUBLIC'
+                                                ? 'Public'
+                                                : 'Employee Only'}
+
+                                        </td>
+
+
+                                        {/* UPLOADED */}
+
+                                        <td>
+
+                                            {document.uploadedAt
+                                                ? new Date(
+                                                    document.uploadedAt
+                                                ).toLocaleDateString()
+                                                : '—'}
+
+                                        </td>
+
+
+                                        {/* STATUS */}
+
+                                        <td>
+
+                                            <span className="status-badge active">
+                                                Active
+                                            </span>
+
+                                        </td>
+
+
+                                        {/* ACTION */}
+
+                                        <td>
+
+                                            <button
+                                                className="deactivate-button"
+                                                onClick={() =>
+                                                    handleDeactivate(
+                                                        document.id
+                                                    )
+                                                }
+                                                disabled={
+                                                    deactivatingId ===
+                                                    document.id
+                                                }
+                                            >
+
+                                                {deactivatingId ===
+                                                    document.id
+                                                    ? 'Deactivating...'
+                                                    : 'Deactivate'}
+
+                                            </button>
+
+                                        </td>
+
+                                    </tr>
+
+                                ))}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                )}
+
+            </section>
+
+
+        </div>
+
+    );
+
 }
+
 
 export default AdminDocuments;
