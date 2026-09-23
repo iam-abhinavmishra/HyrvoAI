@@ -15,11 +15,39 @@ async function handleResponse(response) {
   }
 
   if (!response.ok) {
+
     if (
       typeof data === 'object' &&
       data?.message
     ) {
       throw new Error(data.message);
+    }
+
+    if (
+      typeof data === 'object' &&
+      data?.detail
+    ) {
+      throw new Error(data.detail);
+    }
+
+    if (
+      typeof data === 'object' &&
+      data?.errors &&
+      Array.isArray(data.errors)
+    ) {
+      const messages = data.errors
+        .map(
+          (error) =>
+            error.defaultMessage ||
+            error.message
+        )
+        .filter(Boolean);
+
+      if (messages.length > 0) {
+        throw new Error(
+          messages.join(', ')
+        );
+      }
     }
 
     throw new Error(
@@ -32,37 +60,53 @@ async function handleResponse(response) {
   return data;
 }
 
-export async function loginUser(email, password) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
-  });
+export async function loginUser(
+  email,
+  password
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/auth/login`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+    }
+  );
 
   return handleResponse(response);
 }
 
-export async function sendChatMessage(token, message, sessionId = null) {
-  const response = await fetch(`${API_BASE_URL}/api/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      message,
-      sessionId,
-    }),
-  });
+export async function sendChatMessage(
+  token,
+  message,
+  sessionId = null
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/chat`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        message,
+        sessionId,
+      }),
+    }
+  );
 
   return handleResponse(response);
 }
-export async function getChatSessions(token) {
+
+export async function getChatSessions(
+  token
+) {
   const response = await fetch(
     `${API_BASE_URL}/api/chat/sessions`,
     {
@@ -76,7 +120,10 @@ export async function getChatSessions(token) {
   return handleResponse(response);
 }
 
-export async function getChatMessages(token, sessionId) {
+export async function getChatMessages(
+  token,
+  sessionId
+) {
   const response = await fetch(
     `${API_BASE_URL}/api/chat/sessions/${sessionId}/messages`,
     {
@@ -89,7 +136,10 @@ export async function getChatMessages(token, sessionId) {
 
   return handleResponse(response);
 }
-export async function getAdminDocuments(token) {
+
+export async function getAdminDocuments(
+  token
+) {
   const response = await fetch(
     `${API_BASE_URL}/api/admin/documents`,
     {
@@ -102,7 +152,6 @@ export async function getAdminDocuments(token) {
 
   return handleResponse(response);
 }
-
 
 export async function uploadAdminDocument(
   token,
@@ -132,6 +181,28 @@ export async function uploadAdminDocument(
   return handleResponse(response);
 }
 
+export async function sendPublicChatMessage(
+  message,
+  widgetPublicKey,
+  sessionId = null
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/public/chat`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        widgetPublicKey,
+        sessionId,
+      }),
+    }
+  );
+
+  return handleResponse(response);
+}
 
 export async function deactivateAdminDocument(
   token,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from '../components/ThemeToggle';
 
 import {
   sendChatMessage,
@@ -16,6 +17,32 @@ function ChatDashboard() {
   const [sessionId, setSessionId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  /*
+   * Safely extract an array from API responses.
+   *
+   * Depending on the backend response format, the API may return:
+   *   [...]
+   * or
+   *   { sessions: [...] }
+   * or
+   *   { data: [...] }
+   */
+  function normalizeArray(data, possibleKeys = []) {
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    if (data && typeof data === 'object') {
+      for (const key of possibleKeys) {
+        if (Array.isArray(data[key])) {
+          return data[key];
+        }
+      }
+    }
+
+    return [];
+  }
 
   /*
    * Send a chat message
@@ -53,7 +80,7 @@ function ChatDashboard() {
       /*
        * Save the session ID returned by the backend.
        */
-      if (data.sessionId) {
+      if (data?.sessionId) {
         setSessionId(data.sessionId);
       }
 
@@ -62,8 +89,12 @@ function ChatDashboard() {
        */
       const assistantMessage = {
         role: 'assistant',
-        content: data.answer,
-        sources: data.sources || [],
+        content:
+          data?.answer ||
+          'I could not generate an answer.',
+        sources: Array.isArray(data?.sources)
+          ? data.sources
+          : [],
       };
 
       setMessages((previousMessages) => [
@@ -76,26 +107,28 @@ function ChatDashboard() {
        * conversation appears immediately.
        */
       try {
-        const updatedSessions =
-          await getChatSessions(token);
+        const updatedSessions = await getChatSessions(token);
 
-        setSessions(updatedSessions);
+        const normalizedSessions = normalizeArray(
+          updatedSessions,
+          ['sessions', 'data', 'content']
+        );
+
+        setSessions(normalizedSessions);
       } catch (err) {
         console.error(
           'Failed to refresh chat history:',
           err
         );
       }
-
     } catch (err) {
+      console.error('Failed to send message:', err);
+
       setError(
-        err.message ||
-        'Something went wrong.'
+        err?.message ||
+          'Something went wrong while processing your request.'
       );
 
-      /*
-       * Show an error message in the chat.
-       */
       setMessages((previousMessages) => [
         ...previousMessages,
         {
@@ -105,7 +138,6 @@ function ChatDashboard() {
           sources: [],
         },
       ]);
-
     } finally {
       setLoading(false);
     }
@@ -120,12 +152,19 @@ function ChatDashboard() {
       try {
         const data = await getChatSessions(token);
 
-        setSessions(data);
+        const normalizedSessions = normalizeArray(
+          data,
+          ['sessions', 'data', 'content']
+        );
+
+        setSessions(normalizedSessions);
       } catch (err) {
         console.error(
           'Failed to load chat sessions:',
           err
         );
+
+        setSessions([]);
       }
     }
 
@@ -137,9 +176,7 @@ function ChatDashboard() {
   /*
    * Open an existing conversation.
    */
-  async function handleSelectSession(
-    selectedSessionId
-  ) {
+  async function handleSelectSession(selectedSessionId) {
     if (loading) {
       return;
     }
@@ -153,18 +190,23 @@ function ChatDashboard() {
         selectedSessionId
       );
 
-      const formattedMessages = data.map(
+      const messageList = normalizeArray(
+        data,
+        ['messages', 'data', 'content']
+      );
+
+      const formattedMessages = messageList.map(
         (message) => ({
           role:
-            message.role === 'USER'
+            message?.role === 'USER'
               ? 'user'
               : 'assistant',
 
-          content: message.content,
+          content: message?.content || '',
 
           /*
            * Historical messages currently don't contain
-           * source information, because sources are not
+           * source information because sources are not
            * persisted in ChatMessage.
            */
           sources: [],
@@ -173,13 +215,16 @@ function ChatDashboard() {
 
       setMessages(formattedMessages);
       setSessionId(selectedSessionId);
-
     } catch (err) {
-      setError(
-        err.message ||
-        'Unable to load this conversation.'
+      console.error(
+        'Failed to load conversation:',
+        err
       );
 
+      setError(
+        err?.message ||
+          'Unable to load this conversation.'
+      );
     } finally {
       setLoading(false);
     }
@@ -220,6 +265,7 @@ function ChatDashboard() {
         <button
           className="new-chat-button"
           onClick={handleNewChat}
+          disabled={loading}
         >
           + New chat
         </button>
@@ -248,9 +294,7 @@ function ChatDashboard() {
                       : ''
                   }`}
                   onClick={() =>
-                    handleSelectSession(
-                      session.id
-                    )
+                    handleSelectSession(session.id)
                   }
                   disabled={loading}
                 >
@@ -266,14 +310,17 @@ function ChatDashboard() {
         {/* Sidebar Bottom */}
 
         <div className="sidebar-bottom">
+
+          <ThemeToggle />
+
           {user?.role === 'ADMIN' && (
-  <a
-    href="/admin/documents"
-    className="admin-panel-button"
-  >
-    Admin Panel
-  </a>
-)}
+            <a
+              href="/admin/documents"
+              className="admin-panel-button"
+            >
+              Admin Panel
+            </a>
+          )}
 
           <div className="user-info">
 
@@ -309,7 +356,6 @@ function ChatDashboard() {
 
       </aside>
 
-
       {/* =========================
           MAIN CHAT
       ========================== */}
@@ -321,7 +367,6 @@ function ChatDashboard() {
         <header className="chat-header">
 
           <div>
-
             <h2>
               Company Assistant
             </h2>
@@ -330,11 +375,9 @@ function ChatDashboard() {
               Ask questions about company
               policies and documents.
             </p>
-
           </div>
 
         </header>
-
 
         {/* =========================
             MESSAGES
@@ -361,7 +404,6 @@ function ChatDashboard() {
                 and other internal documents.
               </p>
 
-
               {/* Suggested Questions */}
 
               <div className="suggestion-grid">
@@ -377,7 +419,6 @@ function ChatDashboard() {
                   documents?
                 </button>
 
-
                 <button
                   onClick={() =>
                     setInput(
@@ -388,7 +429,6 @@ function ChatDashboard() {
                   What is the leave policy?
                 </button>
 
-
                 <button
                   onClick={() =>
                     setInput(
@@ -398,7 +438,6 @@ function ChatDashboard() {
                 >
                   What benefits are mentioned?
                 </button>
-
 
                 <button
                   onClick={() =>
@@ -415,11 +454,10 @@ function ChatDashboard() {
             </div>
           )}
 
-
           {/* Chat Messages */}
 
-          {messages.map(
-            (message, index) => (
+          {Array.isArray(messages) &&
+            messages.map((message, index) => (
 
               <div
                 key={index}
@@ -429,39 +467,29 @@ function ChatDashboard() {
                 {/* Avatar */}
 
                 <div className="message-avatar">
-
                   {message.role === 'user'
                     ? 'U'
                     : '✦'}
-
                 </div>
-
 
                 {/* Message Content */}
 
                 <div className="message-content">
 
                   <div className="message-role">
-
                     {message.role === 'user'
                       ? 'You'
                       : 'HyrvoAI'}
-
                   </div>
-
 
                   <div className="message-text">
-
                     {message.content}
-
                   </div>
-
 
                   {/* Sources */}
 
-                  {message.role ===
-                    'assistant' &&
-                    message.sources &&
+                  {message.role === 'assistant' &&
+                    Array.isArray(message.sources) &&
                     message.sources.length > 0 && (
 
                       <div className="sources-section">
@@ -469,7 +497,6 @@ function ChatDashboard() {
                         <p className="sources-title">
                           Sources
                         </p>
-
 
                         <div className="sources-list">
 
@@ -488,22 +515,22 @@ function ChatDashboard() {
                                   📄
                                 </span>
 
-
                                 <div>
 
                                   <strong>
-                                    {source.title ||
-                                      source.document ||
+                                    {source?.title ||
+                                      source?.document ||
+                                      source?.fileName ||
                                       'Company document'}
                                   </strong>
 
                                   <span>
 
-                                    {source.version
+                                    {source?.version
                                       ? `Version ${source.version}`
                                       : ''}
 
-                                    {source.chunkIndex !==
+                                    {source?.chunkIndex !==
                                       undefined
                                       ? ` · Section ${source.chunkIndex}`
                                       : ''}
@@ -527,9 +554,7 @@ function ChatDashboard() {
 
               </div>
 
-            )
-          )}
-
+            ))}
 
           {/* Typing Indicator */}
 
@@ -548,11 +573,9 @@ function ChatDashboard() {
                 </div>
 
                 <div className="typing-indicator">
-
                   <span />
                   <span />
                   <span />
-
                 </div>
 
               </div>
@@ -561,19 +584,15 @@ function ChatDashboard() {
 
           )}
 
-
           {/* Error */}
 
           {error && (
-
             <div className="chat-error">
               {error}
             </div>
-
           )}
 
         </div>
-
 
         {/* =========================
             CHAT INPUT
@@ -600,15 +619,12 @@ function ChatDashboard() {
                   event.key === 'Enter' &&
                   !event.shiftKey
                 ) {
-
                   event.preventDefault();
-
                   handleSendMessage(event);
                 }
 
               }}
             />
-
 
             <button
               type="submit"
@@ -622,7 +638,6 @@ function ChatDashboard() {
             </button>
 
           </form>
-
 
           <p className="input-disclaimer">
             HyrvoAI answers using available

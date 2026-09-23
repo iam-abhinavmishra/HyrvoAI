@@ -39,11 +39,22 @@ public class DocumentService {
                 .findByActiveTrue();
     }
 
-    public List<Document> getDocumentsByDepartment(
-            String department) {
+    public List<Document> getDocumentsByCompany(
+            Long companyId) {
 
         return documentRepository
-                .findByDepartmentAndActiveTrue(
+                .findByCompanyIdAndActiveTrue(
+                        companyId
+                );
+    }
+
+    public List<Document> getDocumentsByDepartment(
+            String department,
+            Long companyId) {
+
+        return documentRepository
+                .findByCompanyIdAndDepartmentAndActiveTrue(
+                        companyId,
                         department
                 );
     }
@@ -59,6 +70,35 @@ public class DocumentService {
 
         documentRepository.findById(id)
                 .ifPresent(document -> {
+
+                    document.setActive(false);
+
+                    documentRepository.save(document);
+
+                    vectorStoreService
+                            .deleteDocumentVectors(
+                                    document.getId()
+                            );
+                });
+    }
+
+    public void deactivateDocumentForCompany(
+            Long documentId,
+            Long companyId
+    ) {
+
+        documentRepository.findById(documentId)
+                .ifPresent(document -> {
+
+                    if (document.getCompany() == null
+                            || !document.getCompany()
+                            .getId()
+                            .equals(companyId)) {
+
+                        throw new IllegalArgumentException(
+                                "Document does not belong to your company"
+                        );
+                    }
 
                     document.setActive(false);
 
@@ -101,17 +141,22 @@ public class DocumentService {
 
     /*
      * Deactivate the currently active version
-     * of a document only within the same department.
+     * of a document only within the same
+     * company and department.
      */
+
     public void replaceActiveDocument(
             String fileName,
-            String department) {
+            String department,
+            Long companyId
+    ) {
 
         List<Document> existingDocuments =
                 documentRepository
-                        .findByFileNameAndDepartmentAndActiveTrue(
+                        .findByFileNameAndDepartmentAndCompanyIdAndActiveTrue(
                                 fileName,
-                                department
+                                department,
+                                companyId
                         );
 
         for (Document document :

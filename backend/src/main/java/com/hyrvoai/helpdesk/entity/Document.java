@@ -12,6 +12,10 @@ public class Document {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     @Column(nullable = false)
     private String fileName;
 
@@ -30,11 +34,31 @@ public class Document {
     @Column(nullable = false)
     private boolean active = true;
 
+    /*
+     * PUBLIC:
+     * Available to unauthenticated/public users.
+     *
+     * EMPLOYEE:
+     * Available only to authenticated employees
+     * belonging to the same company.
+     *
+     * Existing documents may temporarily contain
+     * NULL while the database is being migrated.
+     * NULL is treated as PUBLIC by getAccessLevel().
+     */
+    @Column(name = "access_level")
+    private String accessLevel = "PUBLIC";
+
     public Document() {
     }
 
-    public Document(String fileName, String fileType, String title,
-                    String department, String version) {
+    public Document(
+            String fileName,
+            String fileType,
+            String title,
+            String department,
+            String version
+    ) {
         this.fileName = fileName;
         this.fileType = fileType;
         this.title = title;
@@ -42,12 +66,26 @@ public class Document {
         this.version = version;
         this.uploadedAt = LocalDateTime.now();
         this.active = true;
+        this.accessLevel = "PUBLIC";
     }
 
     @PrePersist
     protected void onCreate() {
+
         if (uploadedAt == null) {
             uploadedAt = LocalDateTime.now();
+        }
+
+        if (accessLevel == null || accessLevel.isBlank()) {
+            accessLevel = "PUBLIC";
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+
+        if (accessLevel == null || accessLevel.isBlank()) {
+            accessLevel = "PUBLIC";
         }
     }
 
@@ -105,5 +143,42 @@ public class Document {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
+    public String getAccessLevel() {
+
+        if (accessLevel == null || accessLevel.isBlank()) {
+            return "PUBLIC";
+        }
+
+        return accessLevel.toUpperCase();
+    }
+
+    public void setAccessLevel(String accessLevel) {
+
+        if (accessLevel == null || accessLevel.isBlank()) {
+            this.accessLevel = "PUBLIC";
+            return;
+        }
+
+        String normalized = accessLevel.toUpperCase();
+
+        if (!normalized.equals("PUBLIC")
+                && !normalized.equals("EMPLOYEE")) {
+
+            throw new IllegalArgumentException(
+                    "Access level must be PUBLIC or EMPLOYEE"
+            );
+        }
+
+        this.accessLevel = normalized;
     }
 }

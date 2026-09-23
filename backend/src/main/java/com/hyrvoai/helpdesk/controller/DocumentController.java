@@ -2,10 +2,13 @@ package com.hyrvoai.helpdesk.controller;
 
 import com.hyrvoai.helpdesk.dto.document.DocumentResponse;
 import com.hyrvoai.helpdesk.entity.Document;
+import com.hyrvoai.helpdesk.entity.User;
 import com.hyrvoai.helpdesk.rag.ingestion.DocumentChunkingService;
 import com.hyrvoai.helpdesk.rag.ingestion.DocumentExtractionService;
 import com.hyrvoai.helpdesk.service.DocumentService;
+import com.hyrvoai.helpdesk.service.UserService;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,15 +22,18 @@ public class DocumentController {
     private final DocumentExtractionService extractionService;
     private final DocumentChunkingService chunkingService;
     private final DocumentService documentService;
+    private final UserService userService;
 
     public DocumentController(
             DocumentExtractionService extractionService,
             DocumentChunkingService chunkingService,
-            DocumentService documentService) {
+            DocumentService documentService,
+            UserService userService) {
 
         this.extractionService = extractionService;
         this.chunkingService = chunkingService;
         this.documentService = documentService;
+        this.userService = userService;
     }
 
     @PostMapping(
@@ -52,20 +58,48 @@ public class DocumentController {
                     value = "version",
                     required = false,
                     defaultValue = "1.0")
-            String version
+            String version,
+
+            Authentication authentication
     ) throws IOException {
 
         /*
-         * Basic validation
+         * Get the authenticated user.
+         */
+        User user =
+                userService
+                        .findByEmail(authentication.getName())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                ));
+
+        /*
+         * Every document uploaded by an admin
+         * belongs to that admin's company.
+         */
+        if (user.getCompany() == null) {
+            throw new IllegalStateException(
+                    "User is not associated with a company"
+            );
+        }
+
+        Long companyId =
+                user.getCompany().getId();
+
+        /*
+         * Basic validation.
          */
         if (file.isEmpty()) {
             throw new IllegalArgumentException(
-                    "File cannot be empty");
+                    "File cannot be empty"
+            );
         }
 
         if (file.getSize() > 10 * 1024 * 1024) {
             throw new IllegalArgumentException(
-                    "File size must be less than 10 MB");
+                    "File size must be less than 10 MB"
+            );
         }
 
         String fileName =
@@ -75,11 +109,12 @@ public class DocumentController {
                 || fileName.isBlank()) {
 
             throw new IllegalArgumentException(
-                    "File name cannot be empty");
+                    "File name cannot be empty"
+            );
         }
 
         /*
-         * Validate file type
+         * Validate file type.
          */
         String contentType =
                 file.getContentType();
@@ -93,11 +128,12 @@ public class DocumentController {
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))) {
 
             throw new IllegalArgumentException(
-                    "Only PDF and DOC/DOCX files are supported");
+                    "Only PDF and DOC/DOCX files are supported"
+            );
         }
 
         /*
-         * Defaults
+         * Defaults.
          */
         if (title == null
                 || title.isBlank()) {
@@ -118,14 +154,11 @@ public class DocumentController {
         }
 
         /*
-         * IMPORTANT:
+         * Extract the document first.
          *
-         * Extract and chunk the new document FIRST.
-         *
-         * We do NOT deactivate the old document yet.
-         *
-         * If extraction fails, the existing document
-         * remains active.
+         * We do NOT deactivate the previous
+         * version until extraction and chunking
+         * succeed.
          */
         String extractedText =
                 extractionService.extractText(
@@ -136,9 +169,13 @@ public class DocumentController {
                 || extractedText.isBlank()) {
 
             throw new IllegalArgumentException(
-                    "Could not extract any text from the document");
+                    "Could not extract any text from the document"
+            );
         }
 
+        /*
+         * Chunk the extracted text.
+         */
         List<String> chunks =
                 chunkingService.chunkText(
                         extractedText
@@ -148,19 +185,23 @@ public class DocumentController {
                 || chunks.isEmpty()) {
 
             throw new IllegalArgumentException(
-                    "Could not create document chunks");
+                    "Could not create document chunks"
+            );
         }
 
         /*
-         * Only after successful extraction and
-         * chunking do we deactivate the previous
-         * active version.
+         * Only after successful extraction
+         * and chunking do we deactivate the
+         * previous active version.
+         *
+         * IMPORTANT:
+         * This is now company-specific.
          */
-        documentService
-                .replaceActiveDocument(
-                        fileName,
-                        department
-                );
+        documentService.replaceActiveDocument(
+                fileName,
+                department,
+                companyId
+        );
 
         /*
          * Create the new document.
@@ -174,17 +215,25 @@ public class DocumentController {
                         version
                 );
 
-        documentService
-                .uploadDocument(document);
+        /*
+         * Associate the document with the
+         * authenticated user's company.
+         */
+        document.setCompany(
+                user.getCompany()
+        );
+
+        documentService.uploadDocument(
+                document
+        );
 
         /*
          * Save chunks and create vector embeddings.
          */
-        documentService
-                .saveChunks(
-                        document,
-                        chunks
-                );
+        documentService.saveChunks(
+                document,
+                chunks
+        );
 
         return "Document uploaded successfully. "
                 + "Created "
@@ -197,12 +246,29 @@ public class DocumentController {
                 + ".";
     }
 
-
     @GetMapping
-    public List<DocumentResponse> getDocuments() {
+    public List<DocumentResponse> getDocuments(
+            Authentication authentication
+    ) {
+
+        User user =
+                userService
+                        .findByEmail(authentication.getName())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                ));
+
+        if (user.getCompany() == null) {
+            throw new IllegalStateException(
+                    "User is not associated with a company"
+            );
+        }
 
         return documentService
-                .getActiveDocuments()
+                .getDocumentsByCompany(
+                        user.getCompany().getId()
+                )
                 .stream()
                 .map(document ->
                         new DocumentResponse(
@@ -219,13 +285,30 @@ public class DocumentController {
                 .toList();
     }
 
-
     @DeleteMapping("/{id}")
     public String deactivateDocument(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
 
-        documentService
-                .deactivateDocument(id);
+        User user =
+                userService
+                        .findByEmail(authentication.getName())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                ));
+
+        if (user.getCompany() == null) {
+            throw new IllegalStateException(
+                    "User is not associated with a company"
+            );
+        }
+
+        documentService.deactivateDocumentForCompany(
+                id,
+                user.getCompany().getId()
+        );
 
         return "Document deactivated successfully";
     }

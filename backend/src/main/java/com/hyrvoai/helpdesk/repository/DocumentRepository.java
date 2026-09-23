@@ -10,16 +10,19 @@ public interface DocumentRepository
 
     List<Document> findByActiveTrue();
 
-    List<Document> findByDepartmentAndActiveTrue(
+    List<Document> findByCompanyIdAndActiveTrue(
+            Long companyId
+    );
+
+    List<Document> findByCompanyIdAndDepartmentAndActiveTrue(
+            Long companyId,
             String department
     );
 
-    List<Document> findByFileNameAndActiveTrue(
-            String fileName
-    );
-
-    List<Document> findByFileNameAndDepartmentAndActiveTrue(
+    List<Document>
+    findByFileNameAndDepartmentAndCompanyIdAndActiveTrue(
             String fileName,
-            String department
+            String department,
+            Long companyId
     );
 }

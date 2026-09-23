@@ -13,7 +13,11 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    /*
+     * OAuth-only users do not need a local password.
+     * Local accounts will still have one.
+     */
+    @Column(nullable = true)
     private String password;
 
     @Column(nullable = false)
@@ -24,6 +28,16 @@ public class User {
 
     @Column
     private String department;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "company_id", nullable = true)
+    private Company company;
+
+    @Column(name = "auth_provider", nullable = false)
+    private String authProvider = "LOCAL";
+
+    @Column(name = "provider_user_id")
+    private String providerUserId;
 
     public User() {
     }
@@ -39,6 +53,7 @@ public class User {
         this.name = name;
         this.role = role;
         this.department = "GENERAL";
+        this.authProvider = "LOCAL";
     }
 
     public User(
@@ -52,11 +67,13 @@ public class User {
         this.password = password;
         this.name = name;
         this.role = role;
+
         this.department =
-                department == null
-                        || department.isBlank()
+                department == null || department.isBlank()
                         ? "GENERAL"
                         : department;
+
+        this.authProvider = "LOCAL";
     }
 
     public Long getId() {
@@ -67,9 +84,7 @@ public class User {
         return email;
     }
 
-    public void setEmail(
-            String email) {
-
+    public void setEmail(String email) {
         this.email = email;
     }
 
@@ -77,9 +92,7 @@ public class User {
         return password;
     }
 
-    public void setPassword(
-            String password) {
-
+    public void setPassword(String password) {
         this.password = password;
     }
 
@@ -87,9 +100,7 @@ public class User {
         return name;
     }
 
-    public void setName(
-            String name) {
-
+    public void setName(String name) {
         this.name = name;
     }
 
@@ -97,26 +108,43 @@ public class User {
         return role;
     }
 
-    public void setRole(
-            String role) {
-
+    public void setRole(String role) {
         this.role = role;
     }
 
     public String getDepartment() {
-
-        if (department == null
-                || department.isBlank()) {
-
+        if (department == null || department.isBlank()) {
             return "GENERAL";
         }
 
         return department;
     }
 
-    public void setDepartment(
-            String department) {
-
+    public void setDepartment(String department) {
         this.department = department;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
+    public String getAuthProvider() {
+        return authProvider;
+    }
+
+    public void setAuthProvider(String authProvider) {
+        this.authProvider = authProvider;
+    }
+
+    public String getProviderUserId() {
+        return providerUserId;
+    }
+
+    public void setProviderUserId(String providerUserId) {
+        this.providerUserId = providerUserId;
     }
 }

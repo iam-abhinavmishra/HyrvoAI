@@ -19,66 +19,96 @@ public class AuthService {
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
-
+            JwtService jwtService
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
+    /*
+     * Public registration is currently disabled.
+     *
+     * HyrvoAI is multi-tenant, so a normal local account
+     * should eventually be created through a company flow.
+     */
     public User register(
-            RegisterRequest request) {
+            RegisterRequest request
+    ) {
 
-        if (userRepository.existsByEmail(
-                request.getEmail())) {
-
-            throw new RuntimeException(
-                    "Email already registered");
-        }
-
-        String department =
-                request.getDepartment();
-
-        if (department == null
-                || department.isBlank()) {
-
-            department = "GENERAL";
-        }
-
-        User user =
-                new User(
-                        request.getEmail(),
-                        passwordEncoder.encode(
-                                request.getPassword()),
-                        request.getName(),
-                        "EMPLOYEE",
-                        department
-                );
-
-        return userRepository.save(user);
+        throw new IllegalStateException(
+                "Public registration is currently disabled. "
+                        + "Please contact your company administrator."
+        );
     }
 
     public AuthResponse login(
-            LoginRequest request) {
+            LoginRequest request
+    ) {
+
+        if (request == null
+                || request.getEmail() == null
+                || request.getEmail().isBlank()
+                || request.getPassword() == null
+                || request.getPassword().isBlank()) {
+
+            throw new RuntimeException(
+                    "Email and password are required"
+            );
+        }
+
+        String email =
+                request.getEmail()
+                        .trim()
+                        .toLowerCase();
 
         User user =
                 userRepository
-                        .findByEmail(
-                                request.getEmail())
+                        .findByEmail(email)
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                        "Invalid email or password"));
+                                        "Invalid email or password"
+                                )
+                        );
+
+        /*
+         * OAuth-only accounts do not have a local password.
+         */
+        if (user.getPassword() == null
+                || user.getPassword().isBlank()) {
+
+            throw new RuntimeException(
+                    "This account uses social login. "
+                            + "Please continue with Google or LinkedIn."
+            );
+        }
 
         if (!passwordEncoder.matches(
                 request.getPassword(),
-                user.getPassword())) {
+                user.getPassword()
+        )) {
 
             throw new RuntimeException(
-                    "Invalid email or password");
+                    "Invalid email or password"
+            );
+        }
+
+        /*
+         * Local accounts currently require a company.
+         */
+        if (user.getCompany() == null) {
+
+            throw new RuntimeException(
+                    "Your account is not associated with a company."
+            );
         }
 
         String token =
-                jwtService.generateToken(user);
+                jwtService.generateToken(
+                        user.getEmail(),
+                        user.getName(),
+                        user.getRole()
+                );
 
         return new AuthResponse(
                 token,

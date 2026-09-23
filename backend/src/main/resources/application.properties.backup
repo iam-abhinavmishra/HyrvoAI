@@ -33,7 +33,6 @@ spring.security.oauth2.client.registration.linkedin.redirect-uri={baseUrl}/login
 spring.security.oauth2.client.provider.linkedin.authorization-uri=https://www.linkedin.com/oauth/v2/authorization
 spring.security.oauth2.client.provider.linkedin.token-uri=https://www.linkedin.com/oauth/v2/accessToken
 spring.security.oauth2.client.provider.linkedin.user-info-uri=https://api.linkedin.com/v2/userinfo
-spring.security.oauth2.client.provider.linkedin.jwk-set-uri=https://www.linkedin.com/oauth/openid/jwks
 spring.security.oauth2.client.provider.linkedin.user-name-attribute=sub
 
 # Frontend
@@ -41,5 +40,3 @@ app.frontend.url=${FRONTEND_URL:http://localhost:5173}
 
 logging.level.org.springframework.security=DEBUG
 logging.level.org.springframework.security.oauth2=TRACE
-
-

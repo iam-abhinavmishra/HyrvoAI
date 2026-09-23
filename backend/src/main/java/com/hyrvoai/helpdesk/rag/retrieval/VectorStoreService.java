@@ -5,69 +5,82 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class VectorStoreService {
 
     private final VectorStore vectorStore;
 
-    public VectorStoreService(VectorStore vectorStore) {
+    public VectorStoreService(
+            VectorStore vectorStore
+    ) {
         this.vectorStore = vectorStore;
     }
 
     public void addChunk(
             String content,
             Document document,
-            Integer chunkIndex) {
+            Integer chunkIndex
+    ) {
 
         org.springframework.ai.document.Document vectorDocument =
-                new org.springframework.ai.document.Document(content);
+                new org.springframework.ai.document.Document(
+                        content,
+                        Map.of(
+                                "documentId",
+                                document.getId(),
 
-        vectorDocument.getMetadata().put(
-                "documentId",
-                document.getId()
+                                "fileName",
+                                document.getFileName(),
+
+                                "title",
+                                document.getTitle(),
+
+                                "version",
+                                document.getVersion(),
+
+                                "chunkIndex",
+                                chunkIndex,
+
+                                "active",
+                                document.isActive(),
+
+                                "department",
+                                getDepartment(document),
+
+                                "companyId",
+                                document.getCompany().getId(),
+
+                                "accessLevel",
+                                document.getAccessLevel()
+                        )
+                );
+
+        vectorStore.add(
+                List.of(vectorDocument)
         );
-
-        vectorDocument.getMetadata().put(
-                "fileName",
-                document.getFileName()
-        );
-
-        vectorDocument.getMetadata().put(
-                "title",
-                document.getTitle()
-        );
-
-        vectorDocument.getMetadata().put(
-                "version",
-                document.getVersion()
-        );
-
-        vectorDocument.getMetadata().put(
-                "chunkIndex",
-                chunkIndex
-        );
-
-        vectorDocument.getMetadata().put(
-                "active",
-                document.isActive()
-        );
-
-        String department = document.getDepartment();
-
-        if (department == null || department.isBlank()) {
-            department = "GENERAL";
-        }
-
-        vectorDocument.getMetadata().put(
-                "department",
-                department
-        );
-
-        vectorStore.add(List.of(vectorDocument));
     }
 
-    public void deleteDocumentVectors(Long documentId) {
+    private String getDepartment(
+            Document document
+    ) {
+
+        String department =
+                document.getDepartment();
+
+        if (department == null
+                || department.isBlank()) {
+
+            return "GENERAL";
+        }
+
+        return department;
+    }
+
+    public void deleteDocumentVectors(
+            Long documentId
+    ) {
 
         vectorStore.delete(
                 "documentId == " + documentId

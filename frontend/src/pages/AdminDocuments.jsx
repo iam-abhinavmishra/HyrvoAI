@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from '../components/ThemeToggle';
 
 import {
   getAdminDocuments,
@@ -203,6 +204,9 @@ function AdminDocuments() {
             Manage the documents used by HyrvoAI.
           </p>
         </div>
+        
+            <ThemeToggle />
+
 
         <a
           href="/chat"
